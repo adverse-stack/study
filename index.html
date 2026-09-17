@@ -47,6 +47,17 @@
     .page-count { font-size: 1.6rem; font-weight: 700; color: var(--success); margin: 10px 0; }
     .chapter-detail { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
   </style>
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6366f1">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker Registered'))
+        .catch((err) => console.log('SW registration failed: ', err));
+    });
+  }
+</script>
 </head>
 <body>
 
