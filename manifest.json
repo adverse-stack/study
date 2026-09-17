@@ -10,10 +10,10 @@
   "categories": ["education", "productivity"],
   "icons": [
     {
-      "src": "https://api.iconify.design/lucide:book-open.svg?width=512&height=512&color=%236366f1",
+      "src": "https://img.icons8.com/fluent/512/book.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
