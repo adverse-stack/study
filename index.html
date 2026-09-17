@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Schedule & Book Tracker</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    h1 { font-size: 1.8rem; }
+    .db-status { display: flex; align-items: center; gap: 10px; }
+    .btn { background-color: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .btn:hover { background-color: var(--accent-hover); }
+    .btn-secondary { background-color: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-secondary:hover { background-color: var(--border); color: var(--text); }
+    .grid { display: grid; grid-template-columns: 350px 1fr; gap: 25px; }
+    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } }
+    .card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 1.2rem; margin-bottom: 15px; color: var(--accent); }
+    form { display: flex; flex-direction: column; gap: 12px; }
+    label { font-size: 0.85rem; color: var(--text-muted); }
+    input, select { background: var(--bg-color); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; outline: none; }
+    .book-list { display: flex; flex-direction: column; gap: 10px; }
+    .book-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-color); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+    .book-item.active { border-color: var(--accent); background: rgba(99, 102, 241, 0.1); }
+    .chapter-inputs { max-height: 250px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .chapter-row { display: flex; gap: 10px; align-items: center; }
+    .chapter-row span { font-size: 0.9rem; min-width: 90px; }
+    .schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
+    .day-card { background: var(--bg-color); border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
+    .day-card.weekend { border-color: var(--accent); }
+    .day-title { font-weight: bold; font-size: 1rem; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: var(--border); }
+    .badge-weekend { background: var(--accent); color: white; }
+    .page-count { font-size: 1.6rem; font-weight: 700; color: var(--success); margin: 10px 0; }
+    .chapter-detail { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Study Planner & Page Calculator</h1>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">3 Chapters Mon–Fri (5 days) | 3 Chapters Sat–Sun (2 days)</p>
+    </div>
+    <div class="db-status">
+      <button class="btn btn-secondary" onclick="exportJSON()">Export Backup (.json)</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">Import Backup (.json)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Add New Book</h2>
+        <form id="addBookForm">
+          <label>Book Title</label>
+          <input type="text" id="bookTitle" placeholder="e.g. Physics Vol. 1" required>
+          <label>Total Chapters</label>
+          <input type="number" id="totalChapters" min="1" max="100" placeholder="e.g. 12" required>
+          <button type="submit" class="btn">Create Book</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Your Books (Click to Edit Pages)</h2>
+        <div id="bookList" class="book-list"></div>
+      </div>
+    </div>
+
+    <div>
+      <div id="chapterEditorCard" class="card" style="display: none;">
+        <h2>Edit Chapter Pages: <span id="activeBookTitle" style="color: var(--text);"></span></h2>
+        <div id="chapterInputs" class="chapter-inputs"></div>
+        <button class="btn" style="margin-top: 15px;" onclick="saveChapterPages()">Save Changes & Update Schedule</button>
+      </div>
+
+      <div id="scheduleCard" class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <h2>Global Reading Roadmap</h2>
+          <select id="blockSelector" onchange="renderSchedule()"></select>
+        </div>
+        <div id="scheduleContainer" class="schedule-grid">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 15px;">Add books and chapters to generate your schedule.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let appData = { books: [] };
+    let activeBookId = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      renderBookList();
+      initScheduleView();
+    });
+
+    function saveData() {
+      localStorage.setItem("study_planner_db", JSON.stringify(appData));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem("study_planner_db");
+      if (saved) {
+        try { appData = JSON.parse(saved); } catch(e) {}
+      }
+    }
+
+    function exportJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+      const anchor = document.createElement('a');
+      anchor.setAttribute("href", dataStr);
+      anchor.setAttribute("download", "study_database.json");
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          appData = JSON.parse(e.target.result);
+          saveData();
+          renderBookList();
+          initScheduleView();
+          alert("Database imported successfully!");
+        } catch (err) {
+          alert("Invalid database file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('addBookForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = document.getElementById('bookTitle').value.trim();
+      const count = parseInt(document.getElementById('totalChapters').value);
+      if (!title || !count) return;
+
+      const chapters = [];
+      for (let i = 1; i <= count; i++) chapters.push({ number: i, pages: 10 });
+
+      const newBook = { id: Date.now().toString(), title, chapters };
+      appData.books.push(newBook);
+      saveData();
+      document.getElementById('addBookForm').reset();
+      renderBookList();
+      selectBook(newBook.id);
+      initScheduleView();
+    });
+
+    function renderBookList() {
+      const container = document.getElementById('bookList');
+      if (appData.books.length === 0) {
+        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem;">No books added yet.</p>`;
+        return;
+      }
+      container.innerHTML = appData.books.map(b => `
+        <div class="book-item ${b.id === activeBookId ? 'active' : ''}" onclick="selectBook('${b.id}')">
+          <div>
+            <strong>${escapeHtml(b.title)}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">${b.chapters.length} Chapters</div>
+          </div>
+          <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="event.stopPropagation(); deleteBook('${b.id}')">Delete</button>
+        </div>
+      `).join('');
+    }
+
+    function deleteBook(id) {
+      if (!confirm("Delete this book?")) return;
+      appData.books = appData.books.filter(b => b.id !== id);
+      if (activeBookId === id) {
+        activeBookId = null;
+        document.getElementById('chapterEditorCard').style.display = 'none';
+      }
+      saveData();
+      renderBookList();
+      initScheduleView();
+    }
+
+    function selectBook(id) {
+      activeBookId = id;
+      renderBookList();
+      const book = appData.books.find(b => b.id === id);
+      if (!book) return;
+
+      document.getElementById('activeBookTitle').innerText = book.title;
+      document.getElementById('chapterEditorCard').style.display = 'block';
+
+      document.getElementById('chapterInputs').innerHTML = book.chapters.map(ch => `
+        <div class="chapter-row">
+          <span>Chapter ${ch.number}:</span>
+          <input type="number" min="1" value="${ch.pages}" data-chapternum="${ch.number}" class="chap-page-input">
+          <span>pages</span>
+        </div>
+      `).join('');
+    }
+
+    function saveChapterPages() {
+      const book = appData.books.find(b => b.id === activeBookId);
+      if (!book) return;
+
+      document.querySelectorAll('.chap-page-input').forEach(input => {
+        const num = parseInt(input.getAttribute('data-chapternum'));
+        const val = parseInt(input.value) || 0;
+        const ch = book.chapters.find(c => c.number === num);
+        if (ch) ch.pages = val;
+      });
+
+      saveData();
+      initScheduleView();
+      alert("Changes saved and schedule updated!");
+    }
+
+    // --- GLOBAL CONTINUOUS QUEUE SCHEDULE LOGIC ---
+    function getAllChaptersQueue() {
+      let queue = [];
+      appData.books.forEach(book => {
+        book.chapters.forEach(ch => {
+          queue.push({
+            bookTitle: book.title,
+            chapterNumber: ch.number,
+            pages: ch.pages
+          });
+        });
+      });
+      return queue;
+    }
+
+    function initScheduleView() {
+      const allChapters = getAllChaptersQueue();
+      const select = document.getElementById('blockSelector');
+      const container = document.getElementById('scheduleContainer');
+      
+      select.innerHTML = '';
+      if (allChapters.length === 0) {
+        container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 15px;">Add books and chapters to generate your schedule.</p>`;
+        return;
+      }
+
+      const totalWeeks = Math.ceil(allChapters.length / 6);
+      for (let i = 0; i < totalWeeks; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.innerText = `Study Week ${i + 1}`;
+        select.appendChild(opt);
+      }
+
+      renderSchedule();
+    }
+
+    function renderSchedule() {
+      const allChapters = getAllChaptersQueue();
+      if (allChapters.length === 0) return;
+
+      const weekIndex = parseInt(document.getElementById('blockSelector').value) || 0;
+      const startIdx = weekIndex * 6;
+
+      // Group of 6 chapters for the week block
+      const weekChapters = allChapters.slice(startIdx, startIdx + 6);
+      
+      // First 3 chapters -> Monday to Friday block
+      const weekdayChs = weekChapters.slice(0, 3);
+      // Next 3 chapters -> Saturday to Sunday block (automatically rolls over to next book if needed!)
+      const weekendChs = weekChapters.slice(3, 6);
+
+      const weekdayTotalPages = weekdayChs.reduce((s, c) => s + c.pages, 0);
+      const weekendTotalPages = weekendChs.reduce((s, c) => s + c.pages, 0);
+
+      const weekdayPagesPerDay = weekdayChs.length > 0 ? Math.round((weekdayTotalPages / 5) * 10) / 10 : 0;
+      const weekendPagesPerDay = weekendChs.length > 0 ? Math.round((weekendTotalPages / 2) * 10) / 10 : 0;
+
+      const container = document.getElementById('scheduleContainer');
+      container.innerHTML = '';
+
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].forEach(day => {
+        container.appendChild(createCard(day, weekdayPagesPerDay, weekdayChs, false));
+      });
+
+      ['Saturday', 'Sunday'].forEach(day => {
+        container.appendChild(createCard(day, weekendPagesPerDay, weekendChs, true));
+      });
+    }
+
+    function createCard(day, pages, chapters, isWeekend) {
+      const card = document.createElement('div');
+      card.className = `day-card ${isWeekend ? 'weekend' : ''}`;
+      
+      let detailsHtml = 'No chapters assigned';
+      if (chapters.length > 0) {
+        detailsHtml = chapters.map(c => `• ${escapeHtml(c.bookTitle)} (Ch. ${c.chapterNumber}): <strong>${c.pages}p</strong>`).join('<br>');
+      }
+
+      card.innerHTML = `
+        <div class="day-title">
+          <span>${day}</span>
+          <span class="badge ${isWeekend ? 'badge-weekend' : ''}">${isWeekend ? 'Weekend' : 'Weekday'}</span>
+        </div>
+        <div class="page-count">${pages} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">pages/day</span></div>
+        <div class="chapter-detail">
+          <strong>Block Chapters:</strong><br>${detailsHtml}
+        </div>
+      `;
+      return card;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+  </script>
+</body>
+</html>
